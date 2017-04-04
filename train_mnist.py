@@ -242,7 +242,7 @@ def main():
     print("beta: {}".format(args.beta))
     print("gamma: {}".format(args.gamma))
     print("")
-    
+
     # run training
     trainer.run()
 

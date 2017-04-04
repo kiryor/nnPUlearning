@@ -4,7 +4,7 @@ This is a reproducing code for PU learning [1] and NNPU learning [2].
 * ```pu_loss.py``` has a chainer implementation of the risk estimator for PU learning and NNPU learning. 
 * ```train_mnist.py``` is an example code of PU learning and NNPU learning. 
 The dataset is MNIST [3] preprocessed in such a way that even digits form the P class and odd digits form the N class.
-
+The default setting is 1000 P data and 59000 U data, and the class prior is the ratio of P class data in U data.
 
 ## Requirements
 * Python 3.6
@@ -18,7 +18,7 @@ You can run an example code of MNIST for comparing the performance of PU learnin
     python3.6 train_mnist.py -g 0
 
 ## Example result
-After running ```training_mnist.py```, 2 figures and 1 log file are made in ```result/```
+After running ```training_mnist.py```, 2 figures and 1 log file are made in ```result/``` by default.
 * Training error in ```result/training_error.png```
 
 ![training error](result/training_error.png "training error")
