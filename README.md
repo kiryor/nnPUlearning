@@ -29,11 +29,11 @@ After running ```training_mnist.py```, 2 figures and 1 log file are made in ```r
 
 
 ## Reference
-[1] du Plessis, Marthinus Christoffel, Gang Niu, and Masashi Sugiyama. 
+[1] Marthinus Christoffel du Plessis, Gang Niu, and Masashi Sugiyama. 
 "Convex formulation for learning from positive and unlabeled data." 
 Proceedings of The 32nd International Conference on Machine Learning. 2015.
 
-[2] Kiryo, Ryuichi, Gang Niu, Plessis, Marthinus Christoffel, and Masashi Sugiyama. 
+[2] Ryuichi Kiryo, Gang Niu, Marthinus Christoffel du Plessis, and Masashi Sugiyama. 
 "Positive-Unlabeled Learning with Non-Negative Risk Estimator." arXiv preprint arXiv:1703.00593 (2017).
 https://arxiv.org/abs/1703.00593
 

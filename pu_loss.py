@@ -40,14 +40,13 @@ class PULoss(function.Function):
         self.x_in = Variable(x)
         y_positive = self.loss_func(self.x_in)
         y_unlabeled = self.loss_func(-self.x_in)
-        positive_loss = F.sum(self.prior * positive / n_positive * y_positive)
-        unlabeled_loss = F.sum(
-            (unlabeled / n_unlabeled - self.prior * positive / n_positive) * y_unlabeled)
-        objective = positive_loss + unlabeled_loss
+        positive_risk = F.sum(self.prior * positive / n_positive * y_positive)
+        negative_risk = F.sum((unlabeled / n_unlabeled - self.prior * positive / n_positive) * y_unlabeled)
+        objective = positive_risk + negative_risk
         if self.NNPU:
-            if unlabeled_loss.data < -self.beta:
-                objective = positive_loss - self.beta
-                self.x_out = -self.gamma * unlabeled_loss
+            if negative_risk.data < -self.beta:
+                objective = positive_risk - self.beta
+                self.x_out = -self.gamma * negative_risk
             else:
                 self.x_out = objective
         else:
@@ -59,7 +58,7 @@ class PULoss(function.Function):
         xp = cuda.get_array_module(*inputs)
         self.x_out.backward()
         gx = gy[0].reshape(gy[0].shape + (1,) * (self.x_in.data.ndim - 1)) * self.x_in.grad
-        return gx, xp.array(-gx, dtype=xp.int32).ravel()
+        return gx, None
 
 
 def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), NNPU=True):
