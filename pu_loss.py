@@ -11,8 +11,6 @@ class PULoss(function.Function):
         if not 0 < prior < 1:
             raise NotImplementedError("The class prior should be in (0, 1)")
         self.prior = prior
-        if isinstance(loss, function.Function):
-            raise TypeError("The loss function should be an instance of chainer.function")
         self.gamma = gamma
         self.beta = beta
         self.loss_func = loss

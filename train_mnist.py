@@ -114,7 +114,7 @@ def process_args():
     assert (0. <= args.gamma <= 1.)
     if args.gpu >= 0:
         chainer.cuda.check_cuda_available()
-        chainer.cuda.get_device(args.gpu).use()
+        chainer.cuda.get_device_from_id(args.gpu).use()
     return args
 
 
@@ -181,17 +181,17 @@ class MultiEvaluator(chainer.training.extensions.Evaluator):
             with chainer.reporter.report_scope(observation):
                 in_arrays = self.converter(batch, self.device)
                 if isinstance(in_arrays, tuple):
-                    in_vars = tuple(Variable(x, volatile='on')
+                    in_vars = tuple(Variable(x)
                                     for x in in_arrays)
                     for k, target in targets.items():
                         target.error(*in_vars)
                 elif isinstance(in_arrays, dict):
-                    in_vars = {key: Variable(x, volatile='on')
+                    in_vars = {key: Variable(x)
                                for key, x in six.iteritems(in_arrays)}
                     for k, target in targets.items():
                         target.error(**in_vars)
                 else:
-                    in_vars = Variable(in_arrays, volatile='on')
+                    in_vars = Variable(in_arrays)
                     for k, target in targets.items():
                         target.error(in_vars)
             summary.add(observation)
