@@ -47,6 +47,20 @@ class LinearClassifier(MyClassifier, Chain):
         return h
 
 
+class ThreeLayerPerceptron(MyClassifier, Chain):
+    def __init__(self, prior, dim):
+        super(ThreeLayerPerceptron, self).__init__(l1=L.Linear(dim, 100),
+                                                   l2=L.Linear(100, 1))
+        self.af = F.relu
+        self.prior = prior
+
+    def calculate(self, x):
+        h = self.l1(x)
+        h = self.af(h)
+        h = self.l2(h)
+        return h
+
+
 class MultiLayerPerceptron(MyClassifier, Chain):
     def __init__(self, prior, dim):
         super(MultiLayerPerceptron, self).__init__(l1=L.Linear(dim, 300, nobias=True),

@@ -13,7 +13,7 @@ except ImportError:
 from chainer import Variable, functions as F
 from chainer.training import extensions
 from sklearn.datasets import fetch_mldata
-from model import LinearClassifier, MultiLayerPerceptron
+from model import LinearClassifier, ThreeLayerPerceptron, MultiLayerPerceptron
 from pu_loss import PULoss
 
 
@@ -89,11 +89,11 @@ def process_args():
     parser = argparse.ArgumentParser(
         description='PU learning and NNPU learning Chainer example: MNIST even v.s. odd',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--batchsize', '-b', type=int, default=1000,
+    parser.add_argument('--batchsize', '-b', type=int, default=10000,
                         help='Mini batch size')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='Zero-origin GPU ID (negative value indicates CPU)')
-    parser.add_argument('--labeled', '-l', default=1000, type=int,
+    parser.add_argument('--labeled', '-l', default=100, type=int,
                         help='# of labeled data')
     parser.add_argument('--epoch', '-e', default=100, type=int,
                         help='# of epochs to learn')
@@ -103,7 +103,7 @@ def process_args():
                         help='Gamma parameter of NNPU')
     parser.add_argument('--loss', type=str, default="sigmoid", choices=['logistic', 'sigmoid'],
                         help='The name of a loss function')
-    parser.add_argument('--model', '-m', default='mlp', choices=['linear', 'mlp'],
+    parser.add_argument('--model', '-m', default='3lp', choices=['linear', '3lp', 'mlp'],
                         help='The name of a classification model')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
@@ -124,7 +124,7 @@ def select_loss(loss_name):
 
 
 def select_model(model_name):
-    models = {"linear": LinearClassifier, "mlp": MultiLayerPerceptron}
+    models = {"linear": LinearClassifier, "3lp": ThreeLayerPerceptron, "mlp": MultiLayerPerceptron}
     return models[model_name]
 
 
@@ -219,7 +219,7 @@ def main():
                   "pu": PULoss(prior, loss=loss_type, NNPU=False)}
     if args.gpu >= 0:
         for m in models.values():
-            m.to_gpu()
+            m.to_gpu(args.gpu)
 
     # trainer setup
     optimizers = {k: make_optimizer(v, 1e-3) for k, v in models.items()}
