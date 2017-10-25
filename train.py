@@ -1,7 +1,6 @@
 import six
 import copy
 import argparse
-import numpy as np
 import chainer
 
 try:
@@ -12,77 +11,10 @@ except ImportError:
 
 from chainer import Variable, functions as F
 from chainer.training import extensions
-from sklearn.datasets import fetch_mldata
-from model import LinearClassifier, ThreeLayerPerceptron, MultiLayerPerceptron
+from model import LinearClassifier, ThreeLayerPerceptron, MultiLayerPerceptron, CNN
 from pu_loss import PULoss
+from dataset import load_dataset
 
-
-def get_mnist():
-    mnist = fetch_mldata('MNIST original', data_home=".")
-    x = mnist.data
-    y = mnist.target
-    # reshape to (#data, #channel, width, height)
-    x = np.reshape(x, (x.shape[0], 1, 28, 28)) / 255.
-    x_tr = np.asarray(x[:60000], dtype=np.float32)
-    y_tr = np.asarray(y[:60000], dtype=np.int32)
-    x_te = np.asarray(x[60000:], dtype=np.float32)
-    y_te = np.asarray(y[60000:], dtype=np.int32)
-    return (x_tr, y_tr), (x_te, y_te)
-
-
-def binarize_10_class(_trainY, _testY):
-    trainY = np.ones(len(_trainY), dtype=np.int32)
-    trainY[_trainY % 2 == 1] = -1
-    testY = np.ones(len(_testY), dtype=np.int32)
-    testY[_testY % 2 == 1] = -1
-    return trainY, testY
-
-
-def make_dataset(dataset, n_labeled):
-    def make_PU_dataset_from_binary_dataset(x, y, labeled=n_labeled):
-        labels = np.unique(y)
-        positive, negative = labels[1], labels[0]
-        X, Y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.int32)
-        assert(len(X) == len(Y))
-        perm = np.random.permutation(len(Y))
-        unlabeled = len(Y) - labeled
-        X, Y = X[perm], Y[perm]
-        n_p = (Y == positive).sum()
-        n_lp = labeled
-        n_n = (Y == negative).sum()
-        n_up = n_p - n_lp
-        n_un = n_n
-        n_u = unlabeled
-        prior = float(n_up) / float(n_u)
-        Xlp = X[Y == positive][:n_lp]
-        Xup = np.concatenate((X[Y == positive][n_lp:], Xlp))[:n_up]
-        Xun = X[Y == negative][:n_un]
-        X = np.asarray(np.concatenate((Xlp, Xup, Xun)), dtype=np.float32)
-        Y = np.asarray(np.concatenate((np.ones(n_lp), -np.ones(n_u))), dtype=np.int32)
-        perm = np.random.permutation(len(Y))
-        X, Y = X[perm], Y[perm]
-        return X, Y, prior
-
-    def make_PN_dataset_from_binary_dataset(x, y):
-        labels = np.unique(y)
-        positive, negative = labels[1], labels[0]
-        X, Y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.int32)
-        n_p = (Y == positive).sum()
-        n_n = (Y == negative).sum()
-        Xp = X[Y == positive][:n_p]
-        Xn = X[Y == negative][:n_n]
-        X = np.asarray(np.concatenate((Xp, Xn)), dtype=np.float32)
-        Y = np.asarray(np.concatenate((np.ones(n_p), -np.ones(n_n))), dtype=np.int32)
-        perm = np.random.permutation(len(Y))
-        X, Y = X[perm], Y[perm]
-        return X, Y
-
-    (_trainX, _trainY), (_testX, _testY) = dataset
-    trainX, trainY, prior = make_PU_dataset_from_binary_dataset(_trainX, _trainY)
-    testX, testY = make_PN_dataset_from_binary_dataset(_testX, _testY)
-    print("training:{}".format(trainX.shape))
-    print("test:{}".format(testX.shape))
-    return list(zip(trainX, trainY)), list(zip(testX, testY)), prior
 
 
 def process_args():
@@ -93,8 +25,18 @@ def process_args():
                         help='Mini batch size')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='Zero-origin GPU ID (negative value indicates CPU)')
+    parser.add_argument('--preset', '-p', type=str, default=None,
+                        choices=['figure1', 'exp-mnist', 'exp-cifar'],
+                        help="Preset of configuration\n"+
+                             "figure1: The setting of Figure1\n"+
+                             "exp-mnist: The setting of MNIST experiment in Experiment\n"+
+                             "exp-cifar: The setting of CIFAR10 experiment in Experiment")
+    parser.add_argument('--dataset', '-d', default='mnist', type=str, choices=['mnist', 'cifar10'],
+                        help='The dataset name')
     parser.add_argument('--labeled', '-l', default=100, type=int,
                         help='# of labeled data')
+    parser.add_argument('--unlabeled', '-u', default=59900, type=int,
+                        help='# of unlabeled data')
     parser.add_argument('--epoch', '-e', default=100, type=int,
                         help='# of epochs to learn')
     parser.add_argument('--beta', '-B', default=0., type=float,
@@ -105,16 +47,42 @@ def process_args():
                         help='The name of a loss function')
     parser.add_argument('--model', '-m', default='3lp', choices=['linear', '3lp', 'mlp'],
                         help='The name of a classification model')
+    parser.add_argument('--stepsize', '-s', default=1e-3, type=float,
+                        help='Stepsize of gradient method')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
     args = parser.parse_args()
-    assert (args.batchsize > 0)
-    assert (args.epoch > 0)
-    assert (0. <= args.beta)
-    assert (0. <= args.gamma <= 1.)
     if args.gpu >= 0:
         chainer.cuda.check_cuda_available()
         chainer.cuda.get_device_from_id(args.gpu).use()
+    if args.preset == "figure1":
+        args.labeled = 100
+        args.unlabeled = 59900
+        args.dataset = "mnist"
+        args.batchsize = 30000
+        args.model = "3lp"
+    elif args.preset == "exp-mnist":
+        args.labeled = 1000
+        args.unlabeled = 60000
+        args.dataset = "mnist"
+        args.batchsize = 30000
+        args.model = "mlp"
+    elif args.preset == "exp-cifar":
+        args.labeled = 1000
+        args.unlabeled = 50000
+        args.dataset = "cifar10"
+        args.batchsize = 500
+        args.model = "cnn"
+        args.stepsize = 1e-5
+    assert (args.batchsize > 0)
+    assert (args.epoch > 0)
+    assert (0 < args.labeled < 30000)
+    if args.dataset == "mnist":
+        assert (0 < args.unlabeled <= 60000)
+    else:
+        assert (0 < args.unlabeled <= 50000)
+    assert (0. <= args.beta)
+    assert (0. <= args.gamma <= 1.)
     return args
 
 
@@ -124,7 +92,8 @@ def select_loss(loss_name):
 
 
 def select_model(model_name):
-    models = {"linear": LinearClassifier, "3lp": ThreeLayerPerceptron, "mlp": MultiLayerPerceptron}
+    models = {"linear": LinearClassifier, "3lp": ThreeLayerPerceptron,
+              "mlp": MultiLayerPerceptron, "cnn": CNN}
     return models[model_name]
 
 
@@ -201,12 +170,9 @@ class MultiEvaluator(chainer.training.extensions.Evaluator):
 
 def main():
     args = process_args()
-
     # dataset setup
-    (trainX, trainY), (testX, testY) = get_mnist()
-    trainY, testY = binarize_10_class(trainY, testY)
-    dim = 784
-    XYtrain, XYtest, prior = make_dataset(((trainX, trainY), (testX, testY)), args.labeled)
+    XYtrain, XYtest, prior = load_dataset(args.dataset, args.labeled, args.unlabeled)
+    dim = XYtrain[0][0].size // len(XYtrain[0][0])
     train_iter = chainer.iterators.SerialIterator(XYtrain, args.batchsize)
     test_iter = chainer.iterators.SerialIterator(XYtest, args.batchsize, repeat=False, shuffle=False)
 
@@ -222,7 +188,7 @@ def main():
             m.to_gpu(args.gpu)
 
     # trainer setup
-    optimizers = {k: make_optimizer(v, 1e-3) for k, v in models.items()}
+    optimizers = {k: make_optimizer(v, args.stepsize) for k, v in models.items()}
     updater = MultiUpdater(train_iter, optimizers, models, device=args.gpu, loss_func=loss_funcs)
     trainer = chainer.training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
     trainer.extend(extensions.LogReport(trigger=(1, 'epoch')))
