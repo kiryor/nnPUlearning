@@ -1,5 +1,5 @@
 # Chainer implementation of non-negative PU learning and unbiased PU learning
-This is a reproducing code for non-negative PU learning [1] and unbiased PU learning [2].
+This is a reproducing code for non-negative PU learning [1] and unbiased PU learning [2] in the paper "Positive-Unlabeled Learning with Non-Negative Risk Estimator".
 
 * ```pu_loss.py``` has a chainer implementation of the risk estimator for non-negative PU (nnPU) learning and unbiased PU (uPU) learning. 
 * ```train.py``` is an example code of nnPU learning and uPU learning. 
@@ -18,7 +18,7 @@ You can run an example code of MNIST for comparing the performance of nnPU learn
 
     python3 train.py -g 0
 
-There are also preset configurations.
+There are also preset configurations for reproducing results on [1].
 * ``--preset figure1``: The setting of Figure 1
 * ``--preset exp-mnist``: The setting of MNIST experiment in Experiment
 * ``--preset exp-cifar``: The setting of CIFAR10 experiment in Experiment
