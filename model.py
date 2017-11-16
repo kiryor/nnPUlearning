@@ -4,6 +4,7 @@ import chainer.links as L
 import numpy as np
 from chainer import Chain, cuda
 
+
 class MyClassifier(Chain):
     prior = 0
 

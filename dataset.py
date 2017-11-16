@@ -33,8 +33,9 @@ def unpickle(file):
     fo.close()
     return dict
 
+
 def conv_data2image(data):
-    return np.rollaxis(data.reshape((3,32,32)),0,3)
+    return np.rollaxis(data.reshape((3, 32, 32)), 0, 3)
 
 
 def get_cifar10(path="./mldata"):
@@ -83,6 +84,7 @@ def binarize_cifar10_class(_trainY, _testY):
     testY = np.ones(len(_testY), dtype=np.int32)
     testY[(_testY==2)|(_testY==3)|(_testY==4)|(_testY==5)|(_testY==6)|(_testY==7)] = -1
     return trainY, testY
+
 
 def make_dataset(dataset, n_labeled, n_unlabeled):
     def make_PU_dataset_from_binary_dataset(x, y, labeled=n_labeled, unlabeled=n_unlabeled):

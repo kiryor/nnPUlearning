@@ -7,14 +7,14 @@ from chainer.utils import type_check
 class PULoss(function.Function):
     """wrapper of loss function for PU learning"""
 
-    def __init__(self, prior, loss=(lambda x: F.sigmoid(-x)), gamma=1, beta=0, NNPU=True):
+    def __init__(self, prior, loss=(lambda x: F.sigmoid(-x)), gamma=1, beta=0, nnPU=True):
         if not 0 < prior < 1:
             raise NotImplementedError("The class prior should be in (0, 1)")
         self.prior = prior
         self.gamma = gamma
         self.beta = beta
         self.loss_func = loss
-        self.NNPU = NNPU
+        self.nnPU = nnPU
         self.positive = 1
         self.unlabeled = -1
 
@@ -34,14 +34,14 @@ class PULoss(function.Function):
         x, t = inputs
         t = t[:, None]
         positive, unlabeled = t == self.positive, t == self.unlabeled
-        n_positive, n_unlabeled = float(max([1, xp.sum(positive)])), float(max([1, xp.sum(unlabeled)]))
+        n_positive, n_unlabeled = max([1., xp.sum(positive)]), max([1., xp.sum(unlabeled)])
         self.x_in = Variable(x)
         y_positive = self.loss_func(self.x_in)
         y_unlabeled = self.loss_func(-self.x_in)
         positive_risk = F.sum(self.prior * positive / n_positive * y_positive)
         negative_risk = F.sum((unlabeled / n_unlabeled - self.prior * positive / n_positive) * y_unlabeled)
         objective = positive_risk + negative_risk
-        if self.NNPU:
+        if self.nnPU:
             if negative_risk.data < -self.beta:
                 objective = positive_risk - self.beta
                 self.x_out = -self.gamma * negative_risk
@@ -53,18 +53,17 @@ class PULoss(function.Function):
         return self.loss,
 
     def backward(self, inputs, gy):
-        xp = cuda.get_array_module(*inputs)
         self.x_out.backward()
         gx = gy[0].reshape(gy[0].shape + (1,) * (self.x_in.data.ndim - 1)) * self.x_in.grad
         return gx, None
 
 
-def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), NNPU=True):
-    """wrapper of loss function for PU learning
+def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), nnPU=True):
+    """wrapper of loss function for non-negative/unbiased PU learning
 
         .. math::
             \\begin{array}{lc}
-            L_[\\pi E_1[l(f(x))]+\\max(E_X[l(-f(x))]-\\pi E_1[l(-f(x))], \\beta) & {\\rm if NNPU learning}\\\\
+            L_[\\pi E_1[l(f(x))]+\\max(E_X[l(-f(x))]-\\pi E_1[l(-f(x))], \\beta) & {\\rm if nnPU learning}\\\\
             L_[\\pi E_1[l(f(x))]+E_X[l(-f(x))]-\\pi E_1[l(-f(x))] & {\\rm otherwise}
             \\end{array}
 
@@ -76,16 +75,19 @@ def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), NNPU=True):
         prior (float): Constant variable for class prior.
         loss (~chainer.function): loss function.
             The loss function should be non-increasing.
+        nnPU (bool): Whether use non-negative PU learning or unbiased PU learning.
+            In default setting, non-negative PU learning will be used.
 
     Returns:
         ~chainer.Variable: A variable object holding a scalar array of the
             PU loss.
 
     See:
-        Kiryo, Ryuichi, Gang Niu, Plessis, Marthinus Christoffel, and Masashi Sugiyama.
-        "Positive-Unlabeled Learning with Non-Negative Risk Estimator." arXiv preprint arXiv:1703.00593 (2017).
+        Ryuichi Kiryo, Gang Niu, Marthinus Christoffel du Plessis, and Masashi Sugiyama.
+        "Positive-Unlabeled Learning with Non-Negative Risk Estimator."
+        Advances in neural information processing systems. 2017.
         du Plessis, Marthinus Christoffel, Gang Niu, and Masashi Sugiyama.
         "Convex formulation for learning from positive and unlabeled data."
         Proceedings of The 32nd International Conference on Machine Learning. 2015.
     """
-    return PULoss(prior=prior, loss=loss, NNPU=NNPU)(x, t)
+    return PULoss(prior=prior, loss=loss, nnPU=nnPU)(x, t)

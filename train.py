@@ -19,7 +19,7 @@ from dataset import load_dataset
 
 def process_args():
     parser = argparse.ArgumentParser(
-        description='PU learning and NNPU learning Chainer example: MNIST even v.s. odd',
+        description='non-negative / unbiased PU learning Chainer implementation',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--batchsize', '-b', type=int, default=10000,
                         help='Mini batch size')
@@ -40,9 +40,9 @@ def process_args():
     parser.add_argument('--epoch', '-e', default=100, type=int,
                         help='# of epochs to learn')
     parser.add_argument('--beta', '-B', default=0., type=float,
-                        help='Beta parameter of NNPU')
+                        help='Beta parameter of nnPU')
     parser.add_argument('--gamma', '-G', default=1., type=float,
-                        help='Gamma parameter of NNPU')
+                        help='Gamma parameter of nnPU')
     parser.add_argument('--loss', type=str, default="sigmoid", choices=['logistic', 'sigmoid'],
                         help='The name of a loss function')
     parser.add_argument('--model', '-m', default='3lp', choices=['linear', '3lp', 'mlp'],
@@ -180,9 +180,9 @@ def main():
     loss_type = select_loss(args.loss)
     selected_model = select_model(args.model)
     model = selected_model(prior, dim)
-    models = {"nnpu": copy.deepcopy(model), "pu": copy.deepcopy(model)}
-    loss_funcs = {"nnpu": PULoss(prior, loss=loss_type, NNPU=True, gamma=args.gamma, beta=args.beta),
-                  "pu": PULoss(prior, loss=loss_type, NNPU=False)}
+    models = {"nnPU": copy.deepcopy(model), "uPU": copy.deepcopy(model)}
+    loss_funcs = {"nnPU": PULoss(prior, loss=loss_type, nnPU=True, gamma=args.gamma, beta=args.beta),
+                  "uPU": PULoss(prior, loss=loss_type, nnPU=False)}
     if args.gpu >= 0:
         for m in models.values():
             m.to_gpu(args.gpu)
@@ -195,12 +195,12 @@ def main():
     trainer.extend(MultiEvaluator(test_iter, models, device=args.gpu))
     trainer.extend(extensions.ProgressBar())
     trainer.extend(extensions.PrintReport(
-                ['epoch', 'nnpu/loss', 'test/nnpu/error', 'pu/loss', 'test/pu/error', 'elapsed_time']))
+                ['epoch', 'nnPU/loss', 'test/nnPU/error', 'uPU/loss', 'test/uPU/error', 'elapsed_time']))
     if extensions.PlotReport.available():
             trainer.extend(
-                extensions.PlotReport(['nnpu/loss', 'pu/loss'], 'epoch', file_name=f'training_error.png'))
+                extensions.PlotReport(['nnPU/loss', 'uPU/loss'], 'epoch', file_name=f'training_error.png'))
             trainer.extend(
-                extensions.PlotReport(['test/nnpu/error', 'test/pu/error'], 'epoch', file_name=f'test_error.png'))
+                extensions.PlotReport(['test/nnPU/error', 'test/uPU/error'], 'epoch', file_name=f'test_error.png'))
     print("prior: {}".format(prior))
     print("loss: {}".format(args.loss))
     print("batchsize: {}".format(args.batchsize))
