@@ -73,8 +73,11 @@ def get_cifar10(path="./mldata"):
     bm = unpickle(os.path.join(folder, 'batches.meta'))
     # label_names = bm['label_names']
     # rehape to (#data, #channel, width, height)
-    x_tr = np.transpose(np.reshape(x_tr,(np.shape(x_tr)[0],32,32,3)),(0,3,1,2))
-    x_te = np.transpose(np.reshape(x_te,(np.shape(x_te)[0],32,32,3)),(0,3,1,2))
+    x_tr = np.reshape(x_tr, (np.shape(x_tr)[0], 3, 32, 32)).astype(np.float32)
+    x_te = np.reshape(x_te, (np.shape(x_te)[0], 3, 32, 32)).astype(np.float32)
+    # normalize
+    x_tr /= 255.
+    x_te /= 255.
     return (x_tr, y_tr), (x_te, y_te)  # , label_names
 
 
