@@ -21,6 +21,9 @@ class MyClassifier(Chain):
     def calculate(self, x):
         return None
 
+    def call_reporter(self, dictionary):
+        chainer.reporter.report(dictionary, self)
+
     def error(self, x, t):
         xp = cuda.get_array_module(x, False)
         size = len(t)
@@ -34,6 +37,24 @@ class MyClassifier(Chain):
         result = (h != t).sum() / size
         chainer.reporter.report({'error': result}, self)
         return cuda.to_cpu(result) if xp != np else result
+
+    def compute_prediction_summary(self, x, t):
+        xp = cuda.get_array_module(x, False)
+        if isinstance(t, chainer.Variable):
+            t = t.data
+        n_p = (t == 1).sum()
+        n_n = (t == -1).sum()
+        size = n_p + n_n
+        with chainer.no_backprop_mode():
+            with chainer.using_config("train", False):
+                h = xp.reshape(xp.sign(self.calculate(x).data), size)
+        if isinstance(h, chainer.Variable):
+            h = h.data
+        t_p = ((h == 1) * (t == 1)).sum()
+        t_n = ((h == -1) * (t == -1)).sum()
+        f_p = n_n - t_n
+        f_n = n_p - t_p
+        return t_p, t_n, f_p, f_n
 
 
 class LinearClassifier(MyClassifier, Chain):

@@ -21,7 +21,7 @@ def process_args():
     parser = argparse.ArgumentParser(
         description='non-negative / unbiased PU learning Chainer implementation',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--batchsize', '-b', type=int, default=10000,
+    parser.add_argument('--batchsize', '-b', type=int, default=30000,
                         help='Mini batch size')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='Zero-origin GPU ID (negative value indicates CPU)')
@@ -168,12 +168,62 @@ class MultiEvaluator(chainer.training.extensions.Evaluator):
         return summary.compute_mean()
 
 
+class MultiPUEvaluator(chainer.training.extensions.Evaluator):
+    default_name = 'validation'
+
+    def __init__(self, prior, *args, **kwargs):
+        super(MultiPUEvaluator, self).__init__(*args, **kwargs)
+        self.prior = prior
+
+    def compute_summary(self, summary):
+        prior = self.prior
+        computed_summary = {}
+        for k, values in summary.items():
+            t_p, t_u, f_p, f_u = values
+            n_p = t_p + f_u
+            n_u = t_u + f_p
+            error_p = 1 - t_p / n_p
+            error_u = 1 - t_u / n_u
+            computed_summary[k] = 2 * prior * error_p + error_u - prior
+        return computed_summary
+
+    def evaluate(self):
+        iterator = self._iterators['main']
+        targets = self.get_all_targets()
+        if self.eval_hook:
+            self.eval_hook(self)
+        it = copy.copy(iterator)
+        summary = {key: np.zeros(4) for key in targets}
+        for batch in it:
+            in_arrays = self.converter(batch, self.device)
+            if isinstance(in_arrays, tuple):
+                in_vars = tuple(Variable(x) for x in in_arrays)
+                for k, target in targets.items():
+                    summary[k] += target.compute_prediction_summary(*in_vars)
+            elif isinstance(in_arrays, dict):
+                in_vars = {key: Variable(x) for key, x in six.iteritems(in_arrays)}
+                for k, target in targets.items():
+                    summary[k] += target.compute_prediction_summary(**in_vars)
+            else:
+                in_vars = Variable(in_arrays)
+                for k, target in targets.items():
+                    summary[k] += target.compute_prediction_summary(in_vars)
+        computed_summary = self.compute_summary(summary)
+        summary = chainer.reporter.DictSummary()
+        observation = {}
+        with chainer.reporter.report_scope(observation):
+            for k, value in computed_summary.items():
+                targets[k].call_reporter({'error': value})
+            summary.add(observation)
+        return summary.compute_mean()
+
 def main():
     args = process_args()
     # dataset setup
     XYtrain, XYtest, prior = load_dataset(args.dataset, args.labeled, args.unlabeled)
     dim = XYtrain[0][0].size // len(XYtrain[0][0])
     train_iter = chainer.iterators.SerialIterator(XYtrain, args.batchsize)
+    valid_iter = chainer.iterators.SerialIterator(XYtrain, args.batchsize, repeat=False, shuffle=False)
     test_iter = chainer.iterators.SerialIterator(XYtest, args.batchsize, repeat=False, shuffle=False)
 
     # model setup
@@ -192,15 +242,18 @@ def main():
     updater = MultiUpdater(train_iter, optimizers, models, device=args.gpu, loss_func=loss_funcs)
     trainer = chainer.training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
     trainer.extend(extensions.LogReport(trigger=(1, 'epoch')))
+    train_01_loss_evaluator = MultiPUEvaluator(prior, valid_iter, models, device=args.gpu)
+    train_01_loss_evaluator.default_name = 'train'
+    trainer.extend(train_01_loss_evaluator)
     trainer.extend(MultiEvaluator(test_iter, models, device=args.gpu))
     trainer.extend(extensions.ProgressBar())
     trainer.extend(extensions.PrintReport(
-                ['epoch', 'nnPU/loss', 'test/nnPU/error', 'uPU/loss', 'test/uPU/error', 'elapsed_time']))
+                ['epoch', 'train/nnPU/error', 'test/nnPU/error', 'train/uPU/error', 'test/uPU/error', 'elapsed_time']))
     if extensions.PlotReport.available():
             trainer.extend(
-                extensions.PlotReport(['nnPU/loss', 'uPU/loss'], 'epoch', file_name=f'training_error.png'))
+                extensions.PlotReport(['train/nnPU/error', 'train/uPU/error'], 'epoch', file_name='training_error.png'))
             trainer.extend(
-                extensions.PlotReport(['test/nnPU/error', 'test/uPU/error'], 'epoch', file_name=f'test_error.png'))
+                extensions.PlotReport(['test/nnPU/error', 'test/uPU/error'], 'epoch', file_name='test_error.png'))
     print("prior: {}".format(prior))
     print("loss: {}".format(args.loss))
     print("batchsize: {}".format(args.batchsize))

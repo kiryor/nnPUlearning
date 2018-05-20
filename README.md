@@ -27,6 +27,7 @@ You can see additional information by adding ```--help```.
 
 ## Example result
 After running ```training_mnist.py```, 2 figures and 1 log file are made in ```result/``` by default.
+The errors are measured by zero-one loss.
 * Training error in ```result/training_error.png```
 
 ![training error](result/training_error.png "training error")
