@@ -2,7 +2,8 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 import numpy as np
-from chainer import Chain, cuda
+from chainer import Chain
+from chainer.backends import cuda
 
 
 class MyClassifier(Chain):
@@ -44,17 +45,16 @@ class MyClassifier(Chain):
             t = t.data
         n_p = (t == 1).sum()
         n_n = (t == -1).sum()
-        size = n_p + n_n
         with chainer.no_backprop_mode():
             with chainer.using_config("train", False):
-                h = xp.reshape(xp.sign(self.calculate(x).data), size)
+                h = xp.ravel(xp.sign(self.calculate(x).data))
         if isinstance(h, chainer.Variable):
             h = h.data
         t_p = ((h == 1) * (t == 1)).sum()
         t_n = ((h == -1) * (t == -1)).sum()
         f_p = n_n - t_n
         f_n = n_p - t_p
-        return t_p, t_n, f_p, f_n
+        return int(t_p), int(t_n), int(f_p), int(f_n)
 
 
 class LinearClassifier(MyClassifier, Chain):

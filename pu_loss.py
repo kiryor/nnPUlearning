@@ -1,20 +1,24 @@
 import chainer.functions as F
 import numpy
-from chainer import cuda, function, Variable
+from chainer import function, Variable
+from chainer.backends import cuda
 from chainer.utils import type_check
 
 
 class PULoss(function.Function):
     """wrapper of loss function for PU learning"""
 
-    def __init__(self, prior, loss=(lambda x: F.sigmoid(-x)), gamma=1, beta=0, nnPU=True):
+    def __init__(self, prior, loss=(lambda x: F.sigmoid(-x)), gamma=1, beta=0, nnpu=True):
         if not 0 < prior < 1:
             raise NotImplementedError("The class prior should be in (0, 1)")
         self.prior = prior
         self.gamma = gamma
         self.beta = beta
         self.loss_func = loss
-        self.nnPU = nnPU
+        self.nnpu = nnpu
+        self.x_in = None
+        self.x_out = None
+        self.loss = None
         self.positive = 1
         self.unlabeled = -1
 
@@ -41,7 +45,7 @@ class PULoss(function.Function):
         positive_risk = F.sum(self.prior * positive / n_positive * y_positive)
         negative_risk = F.sum((unlabeled / n_unlabeled - self.prior * positive / n_positive) * y_unlabeled)
         objective = positive_risk + negative_risk
-        if self.nnPU:
+        if self.nnpu:
             if negative_risk.data < -self.beta:
                 objective = positive_risk - self.beta
                 self.x_out = -self.gamma * negative_risk
@@ -58,7 +62,7 @@ class PULoss(function.Function):
         return gx, None
 
 
-def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), nnPU=True):
+def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), nnpu=True):
     """wrapper of loss function for non-negative/unbiased PU learning
 
         .. math::
@@ -75,7 +79,7 @@ def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), nnPU=True):
         prior (float): Constant variable for class prior.
         loss (~chainer.function): loss function.
             The loss function should be non-increasing.
-        nnPU (bool): Whether use non-negative PU learning or unbiased PU learning.
+        nnpu (bool): Whether use non-negative PU learning or unbiased PU learning.
             In default setting, non-negative PU learning will be used.
 
     Returns:
@@ -90,4 +94,4 @@ def pu_loss(x, t, prior, loss=(lambda x: F.sigmoid(-x)), nnPU=True):
         "Convex formulation for learning from positive and unlabeled data."
         Proceedings of The 32nd International Conference on Machine Learning. 2015.
     """
-    return PULoss(prior=prior, loss=loss, nnPU=nnPU)(x, t)
+    return PULoss(prior=prior, loss=loss, nnpu=nnpu)(x, t)

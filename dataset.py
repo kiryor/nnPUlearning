@@ -19,19 +19,19 @@ def get_mnist():
     return (x_tr, y_tr), (x_te, y_te)
 
 
-def binarize_mnist_class(_trainY, _testY):
-    trainY = np.ones(len(_trainY), dtype=np.int32)
-    trainY[_trainY % 2 == 1] = -1
-    testY = np.ones(len(_testY), dtype=np.int32)
-    testY[_testY % 2 == 1] = -1
-    return trainY, testY
+def binarize_mnist_class(y_train, y_test):
+    y_train_bin = np.ones(len(y_train), dtype=np.int32)
+    y_train_bin[y_train % 2 == 1] = -1
+    y_test_bin = np.ones(len(y_test), dtype=np.int32)
+    y_test_bin[y_test % 2 == 1] = -1
+    return y_train_bin, y_test_bin
 
 
 def unpickle(file):
     fo = open(file, 'rb')
-    dict = pickle.load(fo, encoding='latin1')
+    dictionary = pickle.load(fo, encoding='latin1')
     fo.close()
-    return dict
+    return dictionary
 
 
 def conv_data2image(data):
@@ -39,7 +39,6 @@ def conv_data2image(data):
 
 
 def get_cifar10(path="./mldata"):
-
     if not os.path.isdir(path):
         os.mkdir(path)
     url = "http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
@@ -54,9 +53,9 @@ def get_cifar10(path="./mldata"):
             f.extractall(path=path)
         urllib.request.urlcleanup()
 
-    x_tr = np.empty((0,32*32*3))
+    x_tr = np.empty((0, 32 * 32 * 3))
     y_tr = np.empty(1)
-    for i in range(1,6):
+    for i in range(1, 6):
         fname = os.path.join(folder, "%s%d" % ("data_batch_", i))
         data_dict = unpickle(fname)
         if i == 1:
@@ -81,44 +80,44 @@ def get_cifar10(path="./mldata"):
     return (x_tr, y_tr), (x_te, y_te)  # , label_names
 
 
-def binarize_cifar10_class(_trainY, _testY):
-    trainY = np.ones(len(_trainY), dtype=np.int32)
-    trainY[(_trainY==2)|(_trainY==3)|(_trainY==4)|(_trainY==5)|(_trainY==6)|(_trainY==7)] = -1
-    testY = np.ones(len(_testY), dtype=np.int32)
-    testY[(_testY==2)|(_testY==3)|(_testY==4)|(_testY==5)|(_testY==6)|(_testY==7)] = -1
-    return trainY, testY
+def binarize_cifar10_class(y_train, y_test):
+    y_train_bin = np.ones(len(y_train), dtype=np.int32)
+    y_train_bin[(y_train == 2) | (y_train == 3) | (y_train == 4) | (y_train == 5) | (y_train == 6) | (y_train == 7)] = -1
+    y_test_bin = np.ones(len(y_test), dtype=np.int32)
+    y_test_bin[(y_test == 2) | (y_test == 3) | (y_test == 4) | (y_test == 5) | (y_test == 6) | (y_test == 7)] = -1
+    return y_train_bin, y_test_bin
 
 
 def make_dataset(dataset, n_labeled, n_unlabeled):
-    def make_PU_dataset_from_binary_dataset(x, y, labeled=n_labeled, unlabeled=n_unlabeled):
+    def make_pu_dataset_from_binary_dataset(x, y, labeled=n_labeled, unlabeled=n_unlabeled):
         labels = np.unique(y)
         positive, negative = labels[1], labels[0]
-        X, Y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.int32)
-        assert(len(X) == len(Y))
-        perm = np.random.permutation(len(Y))
-        X, Y = X[perm], Y[perm]
-        n_p = (Y == positive).sum()
+        x, y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.int32)
+        assert(len(x) == len(y))
+        perm = np.random.permutation(len(y))
+        x, y = x[perm], y[perm]
+        n_p = (y == positive).sum()
         n_lp = labeled
-        n_n = (Y == negative).sum()
+        n_n = (y == negative).sum()
         n_u = unlabeled
-        if labeled + unlabeled == len(X):
+        if labeled + unlabeled == len(x):
             n_up = n_p - n_lp
-        elif unlabeled == len(X):
+        elif unlabeled == len(x):
             n_up = n_p
         else:
             raise ValueError("Only support |P|+|U|=|X| or |U|=|X|.")
-        prior = float(n_up) / float(n_u)
-        Xlp = X[Y == positive][:n_lp]
-        Xup = np.concatenate((X[Y == positive][n_lp:], Xlp), axis=0)[:n_up]
-        Xun = X[Y == negative]
-        X = np.asarray(np.concatenate((Xlp, Xup, Xun), axis=0), dtype=np.float32)
-        print(X.shape)
-        Y = np.asarray(np.concatenate((np.ones(n_lp), -np.ones(n_u))), dtype=np.int32)
-        perm = np.random.permutation(len(Y))
-        X, Y = X[perm], Y[perm]
-        return X, Y, prior
+        _prior = float(n_up) / float(n_u)
+        xlp = x[y == positive][:n_lp]
+        xup = np.concatenate((x[y == positive][n_lp:], xlp), axis=0)[:n_up]
+        xun = x[y == negative]
+        x = np.asarray(np.concatenate((xlp, xup, xun), axis=0), dtype=np.float32)
+        print(x.shape)
+        y = np.asarray(np.concatenate((np.ones(n_lp), -np.ones(n_u))), dtype=np.int32)
+        perm = np.random.permutation(len(y))
+        x, y = x[perm], y[perm]
+        return x, y, _prior
 
-    def make_PN_dataset_from_binary_dataset(x, y):
+    def make_pn_dataset_from_binary_dataset(x, y):
         labels = np.unique(y)
         positive, negative = labels[1], labels[0]
         X, Y = np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.int32)
@@ -132,22 +131,22 @@ def make_dataset(dataset, n_labeled, n_unlabeled):
         X, Y = X[perm], Y[perm]
         return X, Y
 
-    (_trainX, _trainY), (_testX, _testY) = dataset
-    trainX, trainY, prior = make_PU_dataset_from_binary_dataset(_trainX, _trainY)
-    testX, testY = make_PN_dataset_from_binary_dataset(_testX, _testY)
-    print("training:{}".format(trainX.shape))
-    print("test:{}".format(testX.shape))
-    return list(zip(trainX, trainY)), list(zip(testX, testY)), prior
+    (x_train, y_train), (x_test, y_test) = dataset
+    x_train, y_train, prior = make_pu_dataset_from_binary_dataset(x_train, y_train)
+    x_test, y_test = make_pn_dataset_from_binary_dataset(x_test, y_test)
+    print("training:{}".format(x_train.shape))
+    print("test:{}".format(x_test.shape))
+    return list(zip(x_train, y_train)), list(zip(x_test, y_test)), prior
 
 
 def load_dataset(dataset_name, n_labeled, n_unlabeled):
     if dataset_name == "mnist":
-        (trainX, trainY), (testX, testY) = get_mnist()
-        trainY, testY = binarize_mnist_class(trainY, testY)
+        (x_train, y_train), (x_test, y_test) = get_mnist()
+        y_train, y_test = binarize_mnist_class(y_train, y_test)
     elif dataset_name == "cifar10":
-        (trainX, trainY), (testX, testY) = get_cifar10()
-        trainY, testY = binarize_cifar10_class(trainY, testY)
+        (x_train, y_train), (x_test, y_test) = get_cifar10()
+        y_train, y_test = binarize_cifar10_class(y_train, y_test)
     else:
         raise ValueError("dataset name {} is unknown.".format(dataset_name))
-    XYtrain, XYtest, prior = make_dataset(((trainX, trainY), (testX, testY)), n_labeled, n_unlabeled)
-    return XYtrain, XYtest, prior
+    xy_train, xy_test, prior = make_dataset(((x_train, y_train), (x_test, y_test)), n_labeled, n_unlabeled)
+    return xy_train, xy_test, prior

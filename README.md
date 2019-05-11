@@ -8,10 +8,11 @@ CIFAR10 [4] preprocessed in such a way that artifacts form the P class and livin
 The default setting is 100 P data and 59900 U data of MNIST, and the class prior is the ratio of P class data in U data.
 
 ## Requirements
-* Python 3
-* Numpy >=1.1
-* Chainer >=2.0
-* Scikit-learn 0.18
+* Python == 3.7
+* Numpy == 1.16
+* Chainer == 5.4
+* Scikit-learn == 0.21
+* Matplotlib == 3.0
 
 ## Quick start
 You can run an example code of MNIST for comparing the performance of nnPU learning and uPU learning on GPU.
