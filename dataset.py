@@ -3,11 +3,11 @@ import urllib.request
 import os
 import tarfile
 import pickle
-from sklearn.datasets import fetch_mldata
-
+from sklearn.datasets import fetch_openml
 
 def get_mnist():
-    mnist = fetch_mldata('MNIST original', data_home=".")
+    mnist = fetch_openml('mnist_784', data_home=".")
+
     x = mnist.data
     y = mnist.target
     # reshape to (#data, #channel, width, height)
